@@ -109,7 +109,7 @@ The test dataset should be a JSON file with the following structure:
 Preamble templates are stored as `.txt` files in the `data_preamble` directory, organized by type (few-shot or zero-shot). Each template can include placeholders like `{language}` and `{example1}` that will be replaced with language-specific data.
 A preamble could look like this:
 
-```python
+```
 Translate the input text into {language}.
 ```
 
