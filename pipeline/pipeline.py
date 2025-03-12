@@ -8,9 +8,7 @@ from typing import Dict, Any, List, Optional, Tuple, Union
 from preamble_generator import Preamble, LANGUAGES, ALL_PREAMBLES
 from eval_utils import calculate_bleu_nltk
 from clean_utils import normalize_text
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+from analyze_results import calculate_average_bleu_per_preamble_language
             
 # Function to generate translation using Cohere chat API
 def generate_translation(input_text: str, preamble: str) -> str:
@@ -199,93 +197,6 @@ def evaluate_prompts_multithreaded(
     return results
 
 
-def calculate_average_bleu_per_preamble_language(results: List[Dict[str, Any]]) -> None:
-    """
-    Calculate and display save/average BLEU scores for each preamble type and language.
-    """
-    try:
-        if not results:
-            print("No results available for BLEU score computation.")
-            return
-
-        # Create a DataFrame from the results
-        df = pd.DataFrame(results)
-
-        # Check if necessary columns are present
-        if 'preamble_type' not in df.columns or 'bleu_scores' not in df.columns or 'language' not in df.columns:
-            print("Results data is missing necessary columns for BLEU score computation.")
-            return
-
-        # Normalize the bleu_scores column (convert from dict to columns)
-        bleu_scores_df = pd.json_normalize(df['bleu_scores'])
-        df = pd.concat([df.drop(columns=['bleu_scores']), bleu_scores_df], axis=1)
-        
-        # Define the numeric columns for BLEU scores
-        numeric_cols = ['1-gram', '2-gram', '3-gram', '4-gram']
-        
-        # Calculate average BLEU scores by language and preamble_type
-        print("\nAverage BLEU Scores per Preamble Type and Language:")
-        grouped_by_type = df.groupby(['language', 'preamble_type'])[numeric_cols].mean()
-        print(grouped_by_type)
-        
-        # Calculate average BLEU scores by language and preamble_name
-        print("\nAverage BLEU Scores per Preamble Name and Language:")
-        grouped_by_name = df.groupby(['language', 'preamble_name'])[numeric_cols].mean()
-        print(grouped_by_name)
-        
-        # Plot the results
-        try:
-            # Set the style
-            sns.set(style="whitegrid")
-            
-            # Create a figure with multiple subplots
-            fig, axes = plt.subplots(2, 2, figsize=(20, 16))
-            
-            # 1. Plot average BLEU scores by language
-            language_scores = df.groupby('language')[numeric_cols].mean()
-            language_scores.plot(kind='bar', ax=axes[0, 0])
-            axes[0, 0].set_title('Average BLEU Scores by Language')
-            axes[0, 0].set_ylabel('BLEU Score')
-            
-            # 2. Plot average BLEU scores by preamble type
-            type_scores = df.groupby('preamble_type')[numeric_cols].mean()
-            type_scores.plot(kind='bar', ax=axes[0, 1])
-            axes[0, 1].set_title('Average BLEU Scores by Preamble Type')
-            axes[0, 1].set_ylabel('BLEU Score')
-            
-            # 3. Plot average BLEU scores by preamble name
-            name_scores = df.groupby('preamble_name')[numeric_cols].mean()
-            name_scores.plot(kind='bar', ax=axes[1, 0])
-            axes[1, 0].set_title('Average BLEU Scores by Preamble Name')
-            axes[1, 0].set_ylabel('BLEU Score')
-            axes[1, 0].tick_params(axis='x', rotation=45)
-            
-            # 4. Heatmap of 4-gram BLEU scores by language and preamble type
-            heatmap_data = df.pivot_table(
-                values='4-gram', 
-                index='language', 
-                columns='preamble_type', 
-                aggfunc='mean'
-            )
-            sns.heatmap(heatmap_data, annot=True, cmap="YlGnBu", fmt=".3f", ax=axes[1, 1])
-            axes[1, 1].set_title('4-gram BLEU Score by Language and Preamble Type')
-            
-            plt.tight_layout()
-            
-            # Save the figure
-            os.makedirs('../results/plots', exist_ok=True)
-            plt.savefig('../results/plots/bleu_scores_summary.png')
-            print("\nPlots saved to ../results/plots/bleu_scores_summary.png")
-            
-        except Exception as e:
-            print(f"Error plotting results: {e}")
-        
-    except ImportError:
-        print("pandas is required for BLEU score analysis. Please install it with 'pip install pandas'.")
-    except Exception as e:
-        print(f"Error calculating average BLEU scores: {e}")
-
-
 def run_evaluation_pipeline(
     dataset_path: str = "../data/test_dataset.json",
     output_path: str = "../results/evaluation_results.json",
@@ -335,8 +246,23 @@ def run_evaluation_pipeline(
     
     save_results(results, output_path)
     
-    # Calculate and display average BLEU scores
-    calculate_average_bleu_per_preamble_language(results)
+    # Calculate and display average BLEU scores using the function from analyze_results.py
+    try:
+        import pandas as pd
+        # Create a DataFrame from the results
+        df = pd.DataFrame(results)
+        
+        # Normalize the bleu_scores column (convert from dict to columns)
+        if 'bleu_scores' in df.columns:
+            bleu_scores_df = pd.json_normalize(df['bleu_scores'])
+            df = pd.concat([df.drop(columns=['bleu_scores']), bleu_scores_df], axis=1)
+            
+            # Calculate and display average BLEU scores
+            calculate_average_bleu_per_preamble_language(df)
+    except ImportError:
+        print("pandas is required for BLEU score analysis. Please install it with 'pip install pandas'.")
+    except Exception as e:
+        print(f"Error calculating average BLEU scores: {e}")
     
     # Print summary
     print("\nEvaluation Summary:")
@@ -344,6 +270,7 @@ def run_evaluation_pipeline(
     print(f"- Languages tested: {languages or list(LANGUAGES)}")
     print(f"- Preamble types tested: {preamble_types or ['Zero-Shot', 'Few-Shot']}")
     print(f"- Results saved to: {output_path}")
+    print(f"\nTo analyze the results in detail, run: python run_analysis.py {output_path}")
 
 
 if __name__ == "__main__":
