@@ -256,16 +256,34 @@ def plot_results(df: pd.DataFrame, output_dir: str) -> None:
 
     # 8. Plot comparing reasoning vs non-reasoning prompts
     plt.figure(figsize=(14, 8))
-    sns.set_palette(["#1E88E5", "#D81B60"])  # Blue and Pink - more contrasting colors
-    sns.boxplot(x="language", y="avg_bleu", hue="is_reasoning", data=df)
+
+    # Create a new figure with a clear color distinction
+    plt.clf()
+    fig, ax = plt.subplots(figsize=(14, 8))
+
+    # Create a custom color palette dictionary that maps False to blue, True to red
+    palette = {False: "#1976D2", True: "#D32F2F"}  # Dark blue for No, dark red for Yes
+
+    # Explicitly pass the palette with the mapping
+    sns.boxplot(
+        x="language", y="avg_bleu", hue="is_reasoning", data=df, palette=palette, ax=ax
+    )
+
+    # Add a custom legend
+    from matplotlib.patches import Patch
+
+    legend_elements = [
+        Patch(facecolor="#1976D2", edgecolor="black", label="No"),
+        Patch(facecolor="#D32F2F", edgecolor="black", label="Yes"),
+    ]
+    ax.legend(handles=legend_elements, title="Is Reasoning")
+
     plt.title("Distribution of BLEU Scores: Reasoning vs Non-Reasoning")
     plt.xlabel("Language")
     plt.ylabel("Average BLEU Score")
     plt.xticks(rotation=45)
-    plt.legend(title="Is Reasoning", labels=["No", "Yes"])
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "bleu_reasoning_vs_non_reasoning.png"))
-
     plt.close("all")
 
 

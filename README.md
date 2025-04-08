@@ -82,7 +82,7 @@ python eval.py --workers 10 --languages Spanish --prompt-types zero-shot --verbo
 You can analyze existing results using the command-line script:
 
 ```bash
-python analyse.py results/result_[timestamp]/evaluation_results.json
+python analyze.py results/result_[timestamp]/evaluation_results.json
 ```
 
 Analysis outputs will be saved to `results/result_[timestamp]/analysis/`.
@@ -92,7 +92,7 @@ Analysis outputs will be saved to `results/result_[timestamp]/analysis/`.
 For convenience, you can run the evaluation and analysis in a single command:
 
 ```bash
-python eval_and_analyse.py --workers 10 --languages Spanish French Chinese --prompt-types zero-shot
+python eval_and_analyze.py --workers 10 --languages Spanish French Chinese --prompt-types zero-shot
 ```
 
 This will:
@@ -104,7 +104,7 @@ This will:
 You can also use the `--verbose` flag with this script:
 
 ```bash
-python eval_and_analyse.py --workers 10 --languages Spanish --prompt-types zero-shot --verbose
+python eval_and_analyze.py --workers 10 --languages Spanish --prompt-types zero-shot --verbose
 ```
 
 ### Using Python Code

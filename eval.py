@@ -95,9 +95,9 @@ def main():
         verbose=args.verbose,
     )
 
-    print(f"\nTo analyze the results, run: python analyse.py {output_path}")
+    print(f"\nTo analyze the results, run: python analyze.py {output_path}")
     print(
-        f"Or run: python eval_and_analyse.py --dataset {args.dataset} --workers {args.workers} "
+        f"Or run: python eval_and_analyze.py --dataset {args.dataset} --workers {args.workers} "
         + (f"--languages {' '.join(args.languages)} " if args.languages else "")
         + (
             f"--prompt-types {' '.join(args.prompt_types)} "
