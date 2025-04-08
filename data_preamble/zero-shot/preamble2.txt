@@ -1,1 +1,0 @@
-Translate the input text into {language} while maintaining the original meaning, context, and structure. Ensure the translation adheres closely to the original text.

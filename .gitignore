@@ -9,3 +9,6 @@ __pycache__/
 *.pyz
 
 prompt_engineering_evaluation.ipynb
+
+results/
+.DS_store
