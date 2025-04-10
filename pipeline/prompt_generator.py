@@ -5,9 +5,9 @@ from typing import Dict, Any, Optional, Literal, Set, List, Union
 from pydantic import BaseModel
 
 
-# Load languages from language_data.json
+# Load languages from few_shot_data.json
 data_dir = Path(__file__).parent.parent / "data"
-language_data_path = data_dir / "language_data.json"
+language_data_path = data_dir / "few_shot_data.json"
 
 try:
     with open(language_data_path, "r", encoding="utf-8") as f:
@@ -44,7 +44,7 @@ class Prompt(BaseModel):
 
         template_path = (
             Path(__file__).parent.parent
-            / "test_data"
+            / "prompt_data"
             / type_dir
             / f"{self.prompt_name}.txt"
         )
@@ -108,7 +108,7 @@ class Prompt(BaseModel):
 
         # Load language data from JSON
         data_dir = Path(__file__).parent.parent / "data"
-        language_data_path = data_dir / "language_data.json"
+        language_data_path = data_dir / "few_shot_data.json"
 
         with open(language_data_path, "r", encoding="utf-8") as f:
             all_language_data = json.load(f)
@@ -151,7 +151,7 @@ def load_all_prompts(verbose: bool = False) -> List[Prompt]:
         A list of Prompt objects
     """
     prompts: List[Prompt] = []
-    base_dir = Path(__file__).parent.parent / "test_data"
+    base_dir = Path(__file__).parent.parent / "prompt_data"
 
     # Load zero-shot prompts
     zero_shot_dir = base_dir / "zero_shot"

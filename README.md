@@ -1,4 +1,6 @@
 # Translation Evaluation Pipeline
+
+> Note: This was ported over from a previous repository and `prompt-engineering` was the root directory of the project. So when calling functions in the command line, please `cd` into the `prompt-engineering` directory first.
 <!-- 
 > :warning: This pipeline is currently in development and has not been tested yet. -->
 
@@ -18,28 +20,28 @@
 ```
 .
 ├── data/
-│   ├── language_data.json       # Language-specific examples
-│   └── test_dataset.json        # Test dataset for evaluation
-├── test_data/
-│   ├── few_shot/                # Few-shot prompt templates
-│   └── zero_shot/               # Zero-shot prompt templates
+│   ├── few_shot_data.json              # Few-shot examples 
+│   └── test_dataset.json               # Test dataset for evaluation
+├── prompt_data/
+│   ├── few_shot/                       # Few-shot prompt templates
+│   └── zero_shot/                      # Zero-shot prompt templates
 ├── pipeline/
-│   ├── prompt_generator.py      # Prompt generation utilities
-│   ├── pipeline.py              # Main evaluation pipeline
-│   ├── clean_utils.py           # Text cleaning utilities
-│   ├── eval_utils.py            # Evaluation metrics
-│   └── analyze_results.py       # Results analysis
-├── results/                     # Evaluation results
-│   └── result_[timestamp]/      # Timestamped results directory
-│       ├── evaluation_results.json  # Evaluation results
-│       └── analysis/            # Analysis outputs
-│           ├── plots/           # Generated visualizations
-│           └── summary_statistics.json  # Summary of results
-├── run_evaluation.py            # Script to run the evaluation pipeline
-├── run_analysis.py              # Script to analyse existing results
-├── run_evaluate_and_analyse.py  # Script to run evaluation and analysis together
-├── example_usage.ipynb          # Jupyter notebook with code examples
-└── requirements.txt             # Project dependencies
+│   ├── prompt_generator.py             # Prompt generation utilities
+│   ├── pipeline.py                     # Main evaluation pipeline
+│   ├── clean_utils.py                  # Text cleaning utilities
+│   ├── eval_utils.py                   # Evaluation metrics
+│   └── analyze_results.py              # Results analysis
+├── results/                            # Evaluation results
+│   └── result_[timestamp]/             # Timestamped results directory
+│       ├── evaluation_results.json     # Evaluation results
+│       └── analysis/                   # Analysis outputs
+│           ├── plots/                  # Generated visualizations
+│           └── summary_statistics.json # Summary of results
+├── eval.py                             # Script to run the evaluation pipeline
+├── analyze.py                          # Script to analyse existing results
+├── eval_and_analyze.py                 # Script to run evaluation and analysis together
+├── example_usage.ipynb                 # Jupyter notebook with code examples
+└── requirements.txt                    # Project dependencies
 ```
 
 ## Installation
@@ -117,7 +119,7 @@ from pipeline.analyze_results import analyze_results
 
 # Run evaluation
 run_evaluation_pipeline(
-    dataset_path="path/to/your/dataset.json",
+    dataset_path="json datset name inside `data/` folder",
     output_path="results/result_20250408/evaluation_results.json",
     max_workers=10,  # Number of parallel workers
     languages=["Spanish", "French", "Chinese"],  # Specific languages to test
@@ -133,6 +135,40 @@ analyze_results(
 ```
 
 For more detailed examples, see the `example_usage.ipynb` Jupyter notebook included in this repository.
+
+## Command-Line Arguments
+
+### eval.py Arguments
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--dataset` | Path to the test dataset JSON file | data/test_dataset.json |
+| `--output` | Path to save the evaluation results | results/evaluation_results.json |
+| `--workers` | Maximum number of worker threads | 5 |
+| `--languages` | List of languages to test (e.g., Spanish French Chinese) | All available languages |
+| `--prompt-types` | List of prompt types to test (zero-shot and/or few-shot) | Both types |
+| `--model` | Cohere model name to use for translations | c4ai-aya-expanse-32b |
+| `--verbose` | Print detailed information during execution | False |
+
+### analyze.py Arguments
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `results_file` | Path to the evaluation results JSON file (required) | None |
+| `--output-dir` | Directory to save the analysis results | results/analysis |
+
+### eval_and_analyze.py Arguments
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--dataset` | Path to the test dataset JSON file | data/test_dataset.json |
+| `--output` | Path to save the evaluation results | results/evaluation_results.json |
+| `--workers` | Maximum number of worker threads | 5 |
+| `--languages` | List of languages to test (e.g., Spanish French Chinese) | All available languages |
+| `--prompt-types` | List of prompt types to test (zero-shot and/or few-shot) | Both types |
+| `--model` | Cohere model name to use for translations | c4ai-aya-expanse-32b |
+| `--analysis-dir` | Directory to save the analysis results | results/analysis |
+| `--verbose` | Print detailed information during execution | False |
 
 ## Test Dataset Format
 
@@ -152,7 +188,7 @@ The test dataset should be a JSON file with the following structure:
 
 ## Prompt Templates
 
-Prompt templates are stored as `.txt` files in the `test_data` directory, organized by type (few_shot or zero_shot). Each template can include placeholders like `{user_input}`,`{target_language}` and `{example1}` that will be replaced with language-specific data.
+Prompt templates are stored as `.txt` files in the `prompt_data` directory, organized by type (few_shot or zero_shot). Each template can include placeholders like `{user_input}`,`{target_language}` and `{example1}` that will be replaced with language-specific data.
 
 ### Basic Prompt Types
 
@@ -169,6 +205,12 @@ A preamble could look like this:
 ```
 Translate the input text into {target_language}.
 ```
+
+### Required Placeholders
+
+- All prompts must include the `{target_language}` placeholder.
+- The `{user_input}` placeholder is optional. If not included, the input will be treated as a preamble and the user input will be inserted later.
+- Few-shot prompts in both `zero_shot/` and `few_shot/` directories should include example placeholders: `{example1}`, `{example2}`, `{example3}`.
 
 ### Prompt Metadata
 
@@ -214,3 +256,8 @@ The analysis script generates:
 - **BLEU Score Distribution**: Shows the distribution of BLEU scores for different combinations
 - **Top Performing Combinations**: Identifies the best language-prompt combinations
 
+# Tl;dr
+```
+python eval_and_analyze.py --dataset <dataset-location> --workers 15 --languages Spanish French Chinese Hindi 
+```
+Is probably all you need to run. Leave `--dataset` empty to default to an inbuilt test set. However, the few-shot prompts will leak most of the answers to the inbuilt test set.

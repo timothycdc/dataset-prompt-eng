@@ -50,6 +50,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--model",
+        type=str,
+        default="c4ai-aya-expanse-32b",
+        help="Cohere model name to use for translations",
+    )
+
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Print detailed information during execution",
@@ -92,6 +99,7 @@ def main():
         max_workers=args.workers,
         languages=args.languages,
         prompt_types=prompt_types,
+        cohere_model=args.model,
         verbose=args.verbose,
     )
 
@@ -104,6 +112,7 @@ def main():
             if args.prompt_types
             else ""
         )
+        + (f"--model {args.model} " if args.model != "c4ai-aya-expanse-32b" else "")
         + (f"--verbose " if args.verbose else "")
     )
 

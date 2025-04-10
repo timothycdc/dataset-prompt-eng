@@ -1,6 +1,8 @@
 import cohere
 import json
 import os
+import time
+import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 import textwrap
@@ -15,6 +17,14 @@ from pipeline.clean_utils import (
     normalize_whitespace,
 )
 from pipeline.analyze_results import calculate_average_bleu_per_preamble_language
+from cohere.errors.too_many_requests_error import TooManyRequestsError
+
+
+# Default model if not specified
+DEFAULT_MODEL = "c4ai-aya-expanse-32b"
+
+# Maximum number of retries for API rate limiting
+MAX_RETRIES = 10
 
 # Initialize Cohere client with API key from environment variable
 cohere_api_key = os.environ.get("COHERE_API_KEY")
@@ -28,6 +38,7 @@ def generate_translation(
     input_text: str,
     prompt: Prompt,
     language: str,
+    model: str = DEFAULT_MODEL,
     verbose: bool = False,
 ) -> Tuple[str, Optional[str]]:
     """
@@ -37,6 +48,7 @@ def generate_translation(
         input_text: The text to translate
         prompt: Either a formatted prompt string or a Prompt object
         language: The target language for translation
+        model: The Cohere model to use for translation
         verbose: Whether to print detailed information
 
     Returns:
@@ -51,6 +63,7 @@ def generate_translation(
 
         if verbose:
             print(f"Using target language: {target_language}")
+            print(f"Using model: {model}")
 
         # Prepare the messages for the chat API
         messages = []
@@ -68,7 +81,13 @@ def generate_translation(
 
             # For reasoning prompts, add additional instruction to use thinking tags
             if is_reasoning_prompt:
-                system_msg += "\nPlease enclose any thinking or reasoning processes that are not related to the final translation in <thinking>...</thinking> tags. Other than that, the final output should only be a translation."
+                system_msg += """\nPlease enclose any thinking or reasoning processes that are not related to the final translation in <thinking>...</thinking> tags. Other than that, the final output should be the translated content with no indicators.
+                            
+The final output should be in the following format:
+<thinking>
+{thinking content}
+</thinking>
+{translated content}"""
 
             messages = [
                 {"role": "system", "content": system_msg},
@@ -107,8 +126,39 @@ The final output should be in the following format:
                 print(textwrap.fill(msg["content"], width=150))
             print("====================================================\n")
 
-        # Generate the translation using the Cohere chat API
-        response = co_client.chat(model="command-a-03-2025", messages=messages)
+        # Generate the translation using the Cohere chat API with exponential backoff
+        retry_count = 0
+        base_delay = 1  # Base delay in seconds
+        max_delay = 60  # Maximum delay in seconds
+
+        while True:
+            try:
+                # Call the Cohere API
+                response = co_client.chat(model=model, messages=messages)
+                break  # Exit the loop if successful
+            except TooManyRequestsError as e:
+                retry_count += 1
+
+                if retry_count > MAX_RETRIES:
+                    print(f"ERROR: Maximum retries exceeded for rate limiting: {e}")
+                    return "", None
+
+                # Calculate exponential backoff with jitter
+                delay = min(max_delay, base_delay * (2 ** (retry_count - 1)))
+                jitter = random.uniform(0, 0.5 * delay)  # Add up to 50% jitter
+                sleep_time = delay + jitter
+
+                if verbose:
+                    print(
+                        f"Rate limit exceeded. Retrying in {sleep_time:.2f} seconds (attempt {retry_count}/{MAX_RETRIES})"
+                    )
+                else:
+                    print(
+                        f"Rate limited. Retry {retry_count}/{MAX_RETRIES} in {sleep_time:.2f}s",
+                        end="\r",
+                    )
+
+                time.sleep(sleep_time)
 
         # Extract the generated text
         generated_translation = response.message.content[0].text.strip()
@@ -143,6 +193,7 @@ def test_single_translation(
     gold_translation: str,
     language: str,
     prompt: Prompt,
+    model: str = DEFAULT_MODEL,
     verbose: bool = False,
 ) -> Dict[str, Any]:
     """
@@ -153,6 +204,7 @@ def test_single_translation(
         gold_translation: The expected translation
         language: The target language
         prompt: The prompt to use
+        model: The Cohere model to use for translation
         verbose: Whether to print detailed information
 
     Returns:
@@ -168,6 +220,7 @@ def test_single_translation(
             input_text,
             prompt,
             language,
+            model=model,
             verbose=verbose,
         )
 
@@ -232,6 +285,7 @@ def test_single_translation(
                 else False
             ),
             "language": language,
+            "model": model,
             "timestamp": datetime.now().isoformat(),
         }
 
@@ -250,6 +304,7 @@ def test_single_translation(
             "prompt_type": prompt.prompt_type,
             "is_preamble": prompt.is_preamble,
             "language": language,
+            "model": model,
             "timestamp": datetime.now().isoformat(),
         }
 
@@ -286,6 +341,7 @@ def evaluate_prompts_multithreaded(
     dataset: List[Dict[str, Any]],
     prompts: Optional[List[Prompt]] = None,
     languages: Optional[List[str]] = None,
+    cohere_model: str = DEFAULT_MODEL,
     max_workers: int = 5,
     verbose: bool = False,
 ) -> List[Dict[str, Any]]:
@@ -296,6 +352,7 @@ def evaluate_prompts_multithreaded(
         dataset: The test dataset
         prompts: List of prompts to test (defaults to ALL_PROMPTS)
         languages: List of languages to test (defaults to LANGUAGES)
+        cohere_model: The Cohere model to use for translations
         max_workers: Maximum number of worker threads
         verbose: Whether to print detailed information
 
@@ -335,6 +392,7 @@ def evaluate_prompts_multithreaded(
                             gold_translation,
                             language,
                             prompt,
+                            cohere_model,
                             verbose,
                         )
                     )
@@ -367,6 +425,7 @@ def run_evaluation_pipeline(
     max_workers: int = 5,
     languages: Optional[List[str]] = None,
     prompt_types: Optional[List[str]] = None,
+    cohere_model: str = DEFAULT_MODEL,
     verbose: bool = False,
 ) -> None:
     """
@@ -378,9 +437,11 @@ def run_evaluation_pipeline(
         max_workers: Maximum number of worker threads
         languages: List of languages to test (defaults to all languages)
         prompt_types: List of prompt types to test (defaults to both Zero-Shot and Few-Shot)
+        cohere_model: The Cohere model to use for translations
         verbose: Whether to print detailed information
     """
     print(f"Starting evaluation pipeline with {max_workers} workers")
+    print(f"Using Cohere model: {cohere_model}")
 
     # Load the test dataset
     dataset = load_test_dataset(dataset_path)
@@ -411,7 +472,7 @@ def run_evaluation_pipeline(
 
     if len(prompts) == 0:
         print(
-            "ERROR: No prompts found! Check that prompt files exist in the test_data directory."
+            "ERROR: No prompts found! Check that prompt files exist in the prompt_data directory."
         )
         return
 
@@ -420,6 +481,7 @@ def run_evaluation_pipeline(
         dataset=dataset,
         prompts=prompts,
         languages=languages,
+        cohere_model=cohere_model,
         max_workers=max_workers,
         verbose=verbose,
     )
@@ -463,6 +525,7 @@ def run_evaluation_pipeline(
     print(f"- Total evaluations: {len(results)}")
     print(f"- Languages tested: {languages or list(LANGUAGES)}")
     print(f"- Prompt types tested: {prompt_types}")
+    print(f"- Cohere model used: {cohere_model}")
     print(f"- Results saved to: {output_path}")
 
 
